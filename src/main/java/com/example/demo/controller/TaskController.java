@@ -2,6 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.model.Task;
 import com.example.demo.repository.TaskRepository;
+import com.example.demo.service.TaskMessageSender;
 import org.springframework.http.ResponseEntity;
 import com.example.demo.service.TaskService;
 import org.springframework.data.domain.Page;
@@ -18,10 +19,12 @@ public class TaskController {
 
     private final TaskRepository taskRepository;
     private final TaskService taskService;
+    private final TaskMessageSender messageSender;
 
-    public TaskController(TaskRepository taskRepository, TaskService taskService) {
+    public TaskController(TaskRepository taskRepository, TaskService taskService, TaskMessageSender messageSender) {
         this.taskRepository = taskRepository;
         this.taskService = taskService;
+        this.messageSender = messageSender;
     }
 
 
@@ -87,6 +90,41 @@ public class TaskController {
     public String processTasksBulk(@RequestBody List<Long> taskIds) {
         taskService.processTasksBulk(taskIds);
         return "Tasks are being processed in the background: " + taskIds;
+    }
+
+    @PostMapping("/process/large-dataset")
+    public String processLargeDataSet() {
+        taskService.processLargeDataSet();
+        return "Large dataset processing started in the background.";
+    }
+
+    @PostMapping("/process/file")
+    public String processLargeFile(@RequestParam String filePath) {
+        taskService.processLargeFile(filePath);
+        return "File processing started in the background for: " + filePath;
+    }
+
+    @PostMapping("/{id}/status")
+    public String updateTaskStatus(@PathVariable Long id, @RequestParam boolean status) {
+        taskService.updateTaskStatusConcurrently(id, status);
+        messageSender.sendTaskNotification(String.valueOf(id), "updated");
+        return "Task " + id + " status update to " + status + " requested.";
+    }
+
+    @GetMapping("/search")
+    public List<Task> searchTasks(@RequestParam String query) {
+        return taskRepository.findByTitleContainingOrDescriptionContaining(query, query);
+    }
+
+    @PostMapping("/generate")
+    public String generateTasks(@RequestParam int count) {
+        taskService.generateLargeDataSet(count);
+        return count + " tasks are being generated.";
+    }
+
+    @GetMapping("/stats/completed")
+    public List<Object[]> getTaskCompletionStats() {
+        return taskRepository.countTasksByCompletionStatus();
     }
 
 
